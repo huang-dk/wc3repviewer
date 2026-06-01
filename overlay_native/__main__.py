@@ -16,7 +16,7 @@ from overlay_native.controller import Controller
 from overlay_native.hotkeys    import install as hk_install, uninstall as hk_uninstall
 
 # ── 配置文件（记忆面板位置）──────────────────────────────────────────────────
-_CFG = os.path.join(os.path.dirname(__file__), 'overlay_native', 'config.json')
+_CFG = os.path.join(os.path.dirname(__file__), 'config.json')
 
 PANEL_W_DEFAULT = 210   # 初始宽度；拖动后由 config 覆盖
 PANEL_H_DEFAULT = 820
