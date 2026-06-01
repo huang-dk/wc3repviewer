@@ -349,11 +349,6 @@ def _unit_row(uid: str, alive: int, dead: int, queue: int,
 def _waiting_widget() -> QWidget:
     w = QWidget()
     w.setStyleSheet('background:transparent;')
-    lay = QVBoxLayout(w)
-    lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    lbl = _lbl('等待 WC3…', '#554433', 13)
-    lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    lay.addWidget(lbl)
     return w
 
 
