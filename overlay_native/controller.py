@@ -9,8 +9,9 @@ class Controller:
         self._right  = right
         self._deaths = DeathTracker()
         # 稳定英雄顺序：player_id -> [hero_id, ...]（首次见到的顺序）
-        self._hero_order: dict = {}
-        self._last_map: str   = ''
+        self._hero_order: dict  = {}
+        self._last_map: str    = ''
+        self._ever_in_game: bool = False   # 本次运行是否至少进过一局
 
         self._ws = WsClient()
         self._ws.state_received.connect(self._on_state)
@@ -27,22 +28,26 @@ class Controller:
         teams = state.get('teams') or {}
         map_name = game.get('map_name', '')
 
-        # 新地图（新局）→ 清空英雄顺序缓存
+        if not game.get('is_in_game'):
+            # 游戏未进行：从未开过局则隐藏，否则保留上局数据不动
+            if not self._ever_in_game:
+                self._left.setVisible(False)
+                self._right.setVisible(False)
+            return
+
+        # ── 游戏进行中 ──────────────────────────────────────────────────────
+        # 新地图（新局开始）→ 清空英雄顺序缓存
         if map_name != self._last_map:
             self._hero_order.clear()
             self._last_map = map_name
 
-        if not game.get('is_in_game'):
-            # 没有游戏进行时自动隐藏面板
-            self._left.setVisible(False)
-            self._right.setVisible(False)
-            return
+        self._ever_in_game = True
 
-        # 游戏开始 → 恢复显示，并强制回到上次位置（layered window 可能漂移）
+        # 恢复显示，并强制回到上次位置（layered window 可能漂移）
         for p in (self._left, self._right):
             if not p.isVisible():
                 p.setVisible(True)
-                p.move(p.x(), p.y())   # 强制重新定位
+                p.move(p.x(), p.y())
 
         self._deaths.update(teams, game.get('game_time', 0), map_name)
 
