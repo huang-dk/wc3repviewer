@@ -38,9 +38,11 @@ class Controller:
             self._right.setVisible(False)
             return
 
-        # 游戏开始 → 自动恢复显示
-        self._left.setVisible(True)
-        self._right.setVisible(True)
+        # 游戏开始 → 恢复显示，并强制回到上次位置（layered window 可能漂移）
+        for p in (self._left, self._right):
+            if not p.isVisible():
+                p.setVisible(True)
+                p.move(p.x(), p.y())   # 强制重新定位
 
         self._deaths.update(teams, game.get('game_time', 0), map_name)
 

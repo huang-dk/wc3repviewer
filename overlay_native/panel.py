@@ -532,8 +532,12 @@ class TeamPanel(QWidget):
 
     def mouseReleaseEvent(self, e):
         self._drag_pos = None
-        if self._save_cb:
-            self._save_cb()          # 拖动结束立即持久化位置
+
+    def moveEvent(self, event):
+        """窗口任何移动（拖动/同步）都保存位置。"""
+        super().moveEvent(event)
+        if self._save_cb and not self._syncing:
+            self._save_cb()
 
     def mouseReleaseEvent(self, e):
         self._drag_pos = None

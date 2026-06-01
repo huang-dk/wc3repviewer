@@ -81,9 +81,6 @@ def main():
 
     left  = TeamPanel(mirror=False)
     right = TeamPanel(mirror=True)
-    left.setGeometry(lx, ly, lw, lh)
-    right.setGeometry(rx, ry, rw, rh)
-
     left._peer  = right
     right._peer = left
     save = lambda: _save_cfg(left, right)
@@ -92,6 +89,9 @@ def main():
 
     left.show()
     right.show()
+    # show() 后再设置位置：Windows 窗口管理器在首次显示时会重置位置
+    QTimer.singleShot(50, lambda: left.setGeometry(lx, ly, lw, lh))
+    QTimer.singleShot(50, lambda: right.setGeometry(rx, ry, rw, rh))
 
     ctrl    = Controller(left, right)
     _hidden = [False]
