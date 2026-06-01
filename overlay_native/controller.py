@@ -33,9 +33,14 @@ class Controller:
             self._last_map = map_name
 
         if not game.get('is_in_game'):
-            self._left.show_waiting()
-            self._right.show_waiting()
+            # 没有游戏进行时自动隐藏面板
+            self._left.setVisible(False)
+            self._right.setVisible(False)
             return
+
+        # 游戏开始 → 自动恢复显示
+        self._left.setVisible(True)
+        self._right.setVisible(True)
 
         self._deaths.update(teams, game.get('game_time', 0), map_name)
 
