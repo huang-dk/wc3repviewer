@@ -2,7 +2,7 @@
 # TeamPanel  ——  单侧透明悬浮窗口（完整实现）
 import ctypes
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout,
     QFrame, QProgressBar, QScrollArea, QApplication,
@@ -310,38 +310,119 @@ def _name_bar(p: dict, mirror: bool) -> QWidget:
     return w
 
 
-# ── 单位行 N(M)K ──────────────────────────────────────────────────────────
+# ── 已研究科技行 ──────────────────────────────────────────────────────────
+def _upgrades_widget(upgrades: list, mirror: bool) -> 'QWidget | None':
+    if not upgrades:
+        return None
+    counts: dict[str, int] = {}
+    for uid in upgrades:
+        if uid:
+            counts[uid] = counts.get(uid, 0) + 1
+    if not counts:
+        return None
+
+    w = QWidget()
+    w.setStyleSheet('background:transparent;')
+    lay = QHBoxLayout(w)
+    lay.setContentsMargins(2, 2, 2, 2)
+    lay.setSpacing(3)
+
+    if mirror:
+        lay.addStretch()
+    for uid, count in counts.items():
+        wrap = QWidget()
+        wrap.setFixedSize(SKILL_SIZE, SKILL_SIZE)
+        wrap.setStyleSheet('background:transparent;')
+        ico = icon_label(uid, SKILL_SIZE)
+        ico.setParent(wrap)
+        ico.move(0, 0)
+        if count > 1:
+            badge = QLabel(str(count), wrap)
+            badge.setStyleSheet(
+                'background:rgba(0,0,0,0.85);color:#f0c050;'
+                'font-size:7px;padding:0 1px;border-radius:2px;')
+            badge.adjustSize()
+            badge.move(SKILL_SIZE - badge.width(),
+                       SKILL_SIZE - badge.height())
+        lay.addWidget(wrap)
+    if not mirror:
+        lay.addStretch()
+
+    return w
+
+
+# ── 单位格：图标（存活数徽章）+ 可选生产进度条 ────────────────────────────────
 def _unit_row(uid: str, alive: int, dead: int, queue: int,
               mirror: bool) -> QWidget:
     w = QWidget()
     w.setStyleSheet('background:transparent;')
-    lay = QHBoxLayout(w)
-    lay.setContentsMargins(2, 1, 2, 1)
-    lay.setSpacing(3)
+    outer = QVBoxLayout(w)
+    outer.setContentsMargins(2, 1, 2, 1)
+    outer.setSpacing(2)
 
+    # ── 图标行：48px 图标 + 存活数徽章（右下角）+ 死亡数文字 ──
+    top = QHBoxLayout()
+    top.setSpacing(4)
+    top.setContentsMargins(0, 0, 0, 0)
+
+    ico_wrap = QWidget()
+    ico_wrap.setFixedSize(UNIT_ICON, UNIT_ICON)
+    ico_wrap.setStyleSheet('background:transparent;')
     ico = icon_label(uid, UNIT_ICON)
+    ico.setParent(ico_wrap)
+    ico.move(0, 0)
 
-    cnt_w = QWidget()
-    cnt_w.setStyleSheet('background:transparent;')
-    cnt = QHBoxLayout(cnt_w)
-    cnt.setContentsMargins(0, 0, 0, 0)
-    cnt.setSpacing(0)
-    cnt.addWidget(_lbl(str(alive), C_ALIVE, 11, True))
-    if dead > 0:
-        cnt.addWidget(_lbl('(', C_DEAD, 11, True))
-        cnt.addWidget(_lbl(str(dead), C_DEAD, 11, True))
-        cnt.addWidget(_lbl(')', C_DEAD, 11, True))
-    if queue > 0:
-        cnt.addWidget(_lbl(f'+{queue}', C_QUEUE, 11, True))
+    alive_badge = QLabel(str(alive), ico_wrap)
+    alive_badge.setStyleSheet(
+        'background:rgba(0,0,0,0.85);color:#e0d8c0;'
+        'font-size:9px;font-weight:bold;padding:0 2px;border-radius:2px;')
+    alive_badge.adjustSize()
+    alive_badge.move(UNIT_ICON - alive_badge.width() - 1,
+                     UNIT_ICON - alive_badge.height() - 1)
 
     if mirror:
-        lay.addStretch()
-        lay.addWidget(cnt_w)
-        lay.addWidget(ico)
+        top.addStretch()
+        if dead > 0:
+            top.addWidget(_lbl(f'✝{dead}', C_DEAD, 9, True))
+        top.addWidget(ico_wrap)
     else:
-        lay.addWidget(ico)
-        lay.addWidget(cnt_w)
-        lay.addStretch()
+        top.addWidget(ico_wrap)
+        if dead > 0:
+            top.addWidget(_lbl(f'✝{dead}', C_DEAD, 9, True))
+        top.addStretch()
+    outer.addLayout(top)
+
+    # ── 生产队列：不定态进度条（表示1个正在制造）+ 黄色+N ──
+    if queue > 0:
+        prod = QHBoxLayout()
+        prod.setSpacing(3)
+        prod.setContentsMargins(0, 0, 0, 0)
+
+        bar = QProgressBar()
+        bar.setRange(0, 0)      # 不定态动画
+        bar.setTextVisible(False)
+        bar.setFixedHeight(3)
+        bar.setStyleSheet("""
+            QProgressBar {
+                background:#1a1808; border-radius:1px; border:none;
+            }
+            QProgressBar::chunk {
+                background:#c8a060; border-radius:1px;
+            }
+        """)
+
+        if mirror:
+            prod.addStretch()
+            if queue > 1:
+                prod.addWidget(_lbl(f'+{queue - 1}', C_QUEUE, 9, True))
+            prod.addWidget(bar)
+        else:
+            prod.addWidget(bar)
+            if queue > 1:
+                prod.addWidget(_lbl(f'+{queue - 1}', C_QUEUE, 9, True))
+            prod.addStretch()
+        outer.addLayout(prod)
+
     return w
 
 
@@ -403,6 +484,24 @@ class TeamPanel(QWidget):
         if old:
             old.deleteLater()
         self._scroll.setWidget(widget)
+        QTimer.singleShot(50, self._fit_height)
+
+    def _fit_height(self):
+        """根据内容自动调整窗口高度，最高不超过屏幕剩余空间。"""
+        w = self._scroll.widget()
+        if not w:
+            return
+        w.adjustSize()
+        need_h = w.sizeHint().height()
+        if need_h <= 0:
+            return
+        screen = QApplication.primaryScreen().geometry()
+        max_h  = screen.height() - self.y() - 20
+        new_h  = max(60, min(need_h + 6, max_h))
+        if abs(new_h - self.height()) > 4:
+            self.resize(self.width(), new_h)
+            if self._save_cb and not self._syncing:
+                self._save_cb()
 
     # ── 公开渲染接口 ──────────────────────────────────────────────────────
     def show_waiting(self):
@@ -421,13 +520,16 @@ class TeamPanel(QWidget):
         lay.setContentsMargins(3, 3, 3, 3)
         lay.setSpacing(2)
 
-        # ── 每名玩家：英雄卡（顺序由 controller._stable_player 保证）
+        # ── 每名玩家：名字条 → 英雄卡 → 已研究科技
         for p in players:
             name_bar = _name_bar(p, self.mirror)
             if name_bar:
                 lay.addWidget(name_bar)
             for h in (p.get('heroes') or []):
                 lay.addWidget(_hero_card(h, self.mirror))
+            upgs = _upgrades_widget(p.get('upgrades') or [], self.mirror)
+            if upgs:
+                lay.addWidget(upgs)
 
         # ── 单位区（双列网格，节省纵向空间）
         units = self._merge_units(players, deaths_map)
@@ -507,7 +609,6 @@ class TeamPanel(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(100, self._apply_win32)
 
     # ── 拖动（含同步对侧面板）────────────────────────────────────────────────

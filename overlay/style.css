@@ -1,7 +1,7 @@
 /* ── Reset ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html,body{background:#0d0d0f;color:#e0d8c0;font-family:'Segoe UI',Arial,sans-serif;
-  font-size:13px;height:100%;overflow:hidden;}
+  font-size:13px;min-height:100%;}
 .hidden{display:none!important;}
 
 /* ── Debug / Status ── */
@@ -21,7 +21,7 @@ html,body{background:#0d0d0f;color:#e0d8c0;font-family:'Segoe UI',Arial,sans-ser
 /* ════════════════════════════════
    LAYOUT
 ════════════════════════════════ */
-.main-layout{display:flex;flex-direction:column;height:100vh;padding-top:18px;}/* top-bar + debug */
+.main-layout{display:flex;flex-direction:column;min-height:100vh;padding-top:18px;}
 
 /* ── Top bar：仅时间 + 地图名，细条 ── */
 .top-bar{
@@ -35,7 +35,7 @@ html,body{background:#0d0d0f;color:#e0d8c0;font-family:'Segoe UI',Arial,sans-ser
     text-overflow:ellipsis;white-space:nowrap;}
 
 /* ── Columns ── */
-.cols{display:flex;flex:1;overflow:hidden;min-height:0;}
+.cols{display:flex;flex:1;align-items:flex-start;}
 
 /* ── Team panels ── */
 .team-panel{
@@ -44,6 +44,8 @@ html,body{background:#0d0d0f;color:#e0d8c0;font-family:'Segoe UI',Arial,sans-ser
   overflow-y:auto;overflow-x:hidden;
   padding:4px;gap:4px;
   background:#111014;
+  position:sticky;top:22px;       /* 固定在顶部，不随中间面板滚动 */
+  max-height:calc(100vh - 22px);  /* 高度限制在视口内，内部滚动 */
 }
 
 /* ── Center panel ── */
@@ -53,33 +55,58 @@ html,body{background:#0d0d0f;color:#e0d8c0;font-family:'Segoe UI',Arial,sans-ser
   display:flex;flex-direction:column;
   background:#0d0c12;
   border-left:1px solid #1a1a24;border-right:1px solid #1a1a24;
-  overflow-y:auto;padding:4px;gap:3px;
+  padding:4px;gap:3px;            /* 移除 overflow-y:auto，高度由内容决定 */
 }
 .vs{text-align:center;font-size:14px;font-weight:bold;
     color:#2a1a08;letter-spacing:3px;padding:2px 0;flex-shrink:0;}
 .udiv{height:1px;background:#1a1820;flex-shrink:0;}
 .unit-label{font-size:9px;color:#3a2a1a;text-align:center;
             text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
-/* 单位行：单行显示全部信息 */
+/* unit-entry：每个单位的完整块（主行 + 可选生产条） */
+.unit-entry{border-radius:3px;}
+.unit-entry:hover{background:#1a1a22;}
+
+/* 单位主行 */
 .unit-row{
-  display:flex;align-items:center;gap:4px;
-  padding:2px 3px;border-radius:3px;
+  display:flex;align-items:flex-start;gap:4px;
+  padding:2px 3px;
   font-size:10px;
 }
-.unit-row:hover{background:#1a1a22;}
 .un{
   flex:1;color:#bbb;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   min-width:0;
 }
-/* 伤害数字：紧凑，直接内联在行里 */
+/* 伤害数字 */
 .ud-deal{color:#ff7060;white-space:nowrap;flex-shrink:0;font-size:9px;}
 .ud-recv{color:#60a0ff;white-space:nowrap;flex-shrink:0;font-size:9px;}
-/* 数量（死亡）+队列 */
-.ua{
-  color:#d8d8d8;font-weight:bold;
-  white-space:nowrap;flex-shrink:0;font-size:10px;
+
+/* 图标块：32px图标 + 存活数徽章 */
+.ut-icon-tile{position:relative;width:32px;height:32px;flex-shrink:0;}
+.ut-icon-tile .icon-wrap{width:100%!important;height:100%!important;}
+.ut-alive{
+  position:absolute;bottom:0;right:0;
+  background:rgba(0,0,0,.85);color:#e0d8c0;
+  font-size:9px;font-weight:bold;padding:0 2px;border-radius:2px;line-height:1.4;
 }
+
+/* 信息列 */
+.ut-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;justify-content:center;}
+.ut-name-row{display:flex;align-items:baseline;gap:3px;}
+.ut-dead{color:#777;font-size:9px;flex-shrink:0;}
+.ut-dmg-row{display:flex;gap:3px;}
+
+/* 生产队列：进度条 + +N */
+.ut-prod-row{display:flex;align-items:center;gap:4px;padding:1px 3px 2px 39px;}
+.ut-prod-track{flex:1;height:3px;background:#1a1808;border-radius:2px;overflow:hidden;}
+.ut-prod-fill{
+  height:100%;
+  background:linear-gradient(90deg,#1a1808 0%,#c8a060 50%,#1a1808 100%);
+  background-size:200% 100%;
+  animation:prod-slide 1.5s linear infinite;
+}
+@keyframes prod-slide{from{background-position:100% 0}to{background-position:-100% 0}}
+.ut-queue-n{color:#f0c050;font-size:9px;font-weight:bold;flex-shrink:0;}
 
 .units-block{flex-shrink:0;margin-bottom:3px;}
 
@@ -185,6 +212,22 @@ html,body{background:#0d0d0f;color:#e0d8c0;font-family:'Segoe UI',Arial,sans-ser
 .bld-track{flex:1;height:4px;background:#1a1a1a;border-radius:2px;overflow:hidden;}
 .bld-fill{height:100%;background:#a06020;transition:width .4s;}
 .bld-pct{font-size:9px;color:#a06020;width:26px;text-align:right;flex-shrink:0;}
+
+/* ── Upgrades section（英雄与建筑之间的已研究科技）── */
+.pc-upgrades{
+  display:flex;flex-wrap:wrap;gap:3px;
+  padding:4px 5px;border-top:1px solid #2a2535;
+}
+.upg-tile{
+  position:relative;width:24px;height:24px;flex-shrink:0;
+  background:#0a0a16;border:1px solid #2a2840;border-radius:2px;overflow:hidden;
+}
+.upg-tile .icon-wrap{width:100%!important;height:100%!important;}
+.upg-count{
+  position:absolute;bottom:0;right:0;
+  background:rgba(0,0,0,.85);color:#f0c050;
+  font-size:7px;padding:0 1px;line-height:1.2;
+}
 
 /* scrollbar */
 ::-webkit-scrollbar{width:3px;}

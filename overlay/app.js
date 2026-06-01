@@ -269,6 +269,23 @@ function buildHeroCard(hero){
   return card;
 }
 
+/* ── Upgrades section ────────────────────────────────────────────────── */
+function buildUpgrades(upgrades){
+  if(!upgrades||!upgrades.length) return null;
+  const counts={};
+  upgrades.forEach(id=>{ if(id) counts[id]=(counts[id]||0)+1; });
+  const entries=Object.entries(counts);
+  if(!entries.length) return null;
+  const sec=el('div','pc-upgrades');
+  entries.forEach(([id,count])=>{
+    const tile=el('div','upg-tile');
+    tile.appendChild(iconEl(id,24));
+    if(count>1) tile.appendChild(el('span','upg-count',count));
+    sec.appendChild(tile);
+  });
+  return sec;
+}
+
 /* ── Player card ─────────────────────────────────────────────────────── */
 function buildPlayerCard(p){
   const card=el('div','pc');
@@ -289,6 +306,10 @@ function buildPlayerCard(p){
     p.heroes.forEach(h=>hs.appendChild(buildHeroCard(h)));
     card.appendChild(hs);
   }
+
+  /* researched upgrades */
+  const upgs=buildUpgrades(p.upgrades);
+  if(upgs) card.appendChild(upgs);
 
   /* buildings under construction */
   const bld=(p.buildings||[]).filter(b=>b.progress<100);
@@ -415,22 +436,43 @@ function buildUnits(players, container, teamKey){
   container.appendChild(label);
 
   units.forEach(u => {
-    // 格式：[icon] 名字  ⚔伤害  🛡承受  数量（✝死亡）+队列
+    const entry = el('div', 'unit-entry');
+
+    // 主行：图标 + 信息列
     const row = el('div', 'unit-row');
 
-    row.appendChild(iconEl(u.id, 16));
-    row.appendChild(el('span', 'un', unitName(u.id)));
+    // 图标块：32px + 存活数徽章
+    const iconTile = el('div', 'ut-icon-tile');
+    iconTile.appendChild(iconEl(u.id, 32));
+    iconTile.appendChild(el('span', 'ut-alive', u.alive));
+    row.appendChild(iconTile);
 
-    if(u.dmg  > 0) row.appendChild(el('span', 'ud-deal', '⚔'+fmtNum(u.dmg)));
-    if(u.recv > 0) row.appendChild(el('span', 'ud-recv', '🛡'+fmtNum(u.recv)));
+    // 信息列：名字（+死亡数）/ 伤害
+    const info = el('div', 'ut-info');
+    const nameRow = el('div', 'ut-name-row');
+    nameRow.appendChild(el('span', 'un', unitName(u.id)));
+    if(u.dead > 0) nameRow.appendChild(el('span', 'ut-dead', `✝${u.dead}`));
+    info.appendChild(nameRow);
+    if(u.dmg > 0 || u.recv > 0){
+      const dmgRow = el('div', 'ut-dmg-row');
+      if(u.dmg  > 0) dmgRow.appendChild(el('span', 'ud-deal', '⚔'+fmtNum(u.dmg)));
+      if(u.recv > 0) dmgRow.appendChild(el('span', 'ud-recv', '🛡'+fmtNum(u.recv)));
+      info.appendChild(dmgRow);
+    }
+    row.appendChild(info);
+    entry.appendChild(row);
 
-    // 数量部分：存活（✝死亡）+队列
-    let countStr = String(u.alive);
-    if(u.dead  > 0) countStr += `（✝${u.dead}）`;
-    if(u.queue > 0) countStr += `+${u.queue}`;
-    row.appendChild(el('span', 'ua', countStr));
+    // 生产队列：进度条（表示1个正在制造）+ 黄色+N（队列中剩余）
+    if(u.queue > 0){
+      const prodRow = el('div', 'ut-prod-row');
+      const track = el('div', 'ut-prod-track');
+      track.appendChild(el('div', 'ut-prod-fill'));
+      prodRow.appendChild(track);
+      if(u.queue > 1) prodRow.appendChild(el('span', 'ut-queue-n', `+${u.queue-1}`));
+      entry.appendChild(prodRow);
+    }
 
-    container.appendChild(row);
+    container.appendChild(entry);
   });
 }
 
