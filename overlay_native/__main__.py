@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import ctypes, sys, json, os
+import ctypes, sys, json, os, subprocess
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwarenessContext(-4)
@@ -15,13 +15,28 @@ from overlay_native.panel      import TeamPanel
 from overlay_native.controller import Controller
 from overlay_native.hotkeys    import install as hk_install, uninstall as hk_uninstall
 
-# ── 配置文件（记忆面板位置）──────────────────────────────────────────────────
-_CFG = os.path.join(os.path.dirname(__file__), 'config.json')
+_ROOT = os.path.dirname(os.path.dirname(__file__))   # wc3rep/
+_CFG  = os.path.join(os.path.dirname(__file__), 'config.json')
 
-PANEL_W_DEFAULT = 210   # 初始宽度；拖动后由 config 覆盖
+PANEL_W_DEFAULT = 210
 PANEL_H_DEFAULT = 820
 
 
+# ── analyzer 子进程管理 ────────────────────────────────────────────────────
+def _start_analyzer() -> subprocess.Popen | None:
+    """用 venv Python 启动 analyzer 服务器子进程。"""
+    # 兼容 MSYS2 venv（bin/）和 Windows venv（Scripts/）
+    for rel in ('.venv/bin/python.exe', '.venv/Scripts/python.exe'):
+        venv_py = os.path.normpath(os.path.join(_ROOT, rel))
+        if os.path.exists(venv_py):
+            proc = subprocess.Popen([venv_py, '-m', 'analyzer'], cwd=_ROOT)
+            print(f'[launcher] analyzer started (pid {proc.pid})')
+            return proc
+    print('[launcher] venv Python not found — start analyzer manually')
+    return None
+
+
+# ── 位置持久化 ─────────────────────────────────────────────────────────────
 def _load_cfg() -> dict:
     try:
         with open(_CFG, encoding='utf-8') as f:
@@ -42,14 +57,17 @@ def _save_cfg(left: TeamPanel, right: TeamPanel):
         json.dump(data, f, indent=2)
 
 
+# ── 主程序 ─────────────────────────────────────────────────────────────────
 def main():
+    # 启动 analyzer 子进程
+    analyzer = _start_analyzer()
+
     app = QApplication(sys.argv)
     app.setApplicationName('WC3 Overlay Native')
 
     cfg    = _load_cfg()
     screen = QApplication.primaryScreen().geometry()
 
-    # ── 默认位置（首次或无 config）
     ldef = cfg.get('left',  {})
     rdef = cfg.get('right', {})
     lx = ldef.get('x', 10)
@@ -63,13 +81,11 @@ def main():
 
     left  = TeamPanel(mirror=False)
     right = TeamPanel(mirror=True)
-
     left.setGeometry(lx, ly, lw, lh)
     right.setGeometry(rx, ry, rw, rh)
 
-    # ── 同步拖动 + 持久化
-    left._peer   = right
-    right._peer  = left
+    left._peer  = right
+    right._peer = left
     save = lambda: _save_cfg(left, right)
     left._save_cb  = save
     right._save_cb = save
@@ -80,24 +96,30 @@ def main():
     ctrl    = Controller(left, right)
     _hidden = [False]
 
-    def on_toggle():
-        ctrl.toggle_both()
+    def _quit():
+        _save_cfg(left, right)
+        if analyzer and analyzer.poll() is None:
+            analyzer.terminate()
+            print('[launcher] analyzer terminated')
+        app.quit()
 
+    def on_toggle(): ctrl.toggle_both()
     def on_hide():
         _hidden[0] = not _hidden[0]
         ctrl.hide_both(_hidden[0])
 
-    def on_quit():
-        _save_cfg(left, right)
-        app.quit()
+    hk = hk_install(app, on_toggle, on_hide, _quit)
 
-    hk = hk_install(app, on_toggle, on_hide, on_quit)
+    # 监控 analyzer：子进程意外退出时关闭 overlay
+    if analyzer:
+        watcher = QTimer()
+        watcher.timeout.connect(
+            lambda: _quit() if analyzer.poll() is not None else None)
+        watcher.start(2000)
 
     def hint():
-        print('WC3 Overlay Native 已启动')
-        print(f'  位置已从 config 读取: L({lx},{ly}) R({rx},{ry})')
+        print('WC3 Overlay 已启动（analyzer + overlay 一体）')
         print('  Ctrl+Shift+F9   穿透/交互  |  F10 隐藏  |  F11 退出')
-        print('  交互模式下拖动任意面板 → 两侧同步移动，松手自动保存位置')
 
     QTimer.singleShot(400, hint)
 
