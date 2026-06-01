@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import ctypes, sys, json, os, subprocess
+from pathlib import Path
 
 try:
     ctypes.windll.shcore.SetProcessDpiAwarenessContext(-4)
@@ -15,8 +16,9 @@ from overlay_native.panel      import TeamPanel
 from overlay_native.controller import Controller
 from overlay_native.hotkeys    import install as hk_install, uninstall as hk_uninstall
 
-_ROOT = os.path.dirname(os.path.dirname(__file__))   # wc3rep/
-_CFG  = os.path.join(os.path.dirname(__file__), 'config.json')
+_HERE = Path(__file__).resolve().parent          # overlay_native/
+_ROOT = str(_HERE.parent)                        # wc3rep/
+_CFG  = str(_HERE / 'config.json')
 
 PANEL_W_DEFAULT = 210
 PANEL_H_DEFAULT = 820
@@ -52,7 +54,7 @@ def _save_cfg(left: TeamPanel, right: TeamPanel):
         'right': {'x': right.x(), 'y': right.y(),
                   'w': right.width(), 'h': right.height()},
     }
-    os.makedirs(os.path.dirname(_CFG), exist_ok=True)
+    Path(_CFG).parent.mkdir(parents=True, exist_ok=True)
     with open(_CFG, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
 
@@ -118,8 +120,9 @@ def main():
         watcher.start(2000)
 
     def hint():
-        print('WC3 Overlay 已启动（analyzer + overlay 一体）')
-        print('  Ctrl+Shift+F9   穿透/交互  |  F10 隐藏  |  F11 退出')
+        print(f'WC3 Overlay 已启动  config={_CFG}')
+        print(f'  位置: L({lx},{ly}) R({rx},{ry})')
+        print('  Ctrl+Shift+F9 穿透/交互  |  F10 隐藏  |  F11 退出')
 
     QTimer.singleShot(400, hint)
 
