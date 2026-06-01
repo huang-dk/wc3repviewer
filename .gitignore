@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Logs
+server_out.txt
+server_err.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
