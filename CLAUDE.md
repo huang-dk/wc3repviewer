@@ -4,7 +4,9 @@ This file documents the codebase for AI assistants (Claude) working on this proj
 
 ## What this project does
 
-Reads Warcraft III Reforged's **Observer Shared Memory API** (`War3StatsObserverSharedMemory`) in real-time while a replay is playing, and renders a browser overlay with game statistics.
+Reads Warcraft III Reforged's **Observer Shared Memory API** (`War3StatsObserverSharedMemory`) in real-time while a replay is playing, and renders a transparent **PyQt6 overlay** (`overlay_native/`) with game statistics directly over the game window.
+
+The analyzer (`analyzer/`) reads shared memory and pushes game state over a WebSocket (`ws://localhost:8125`); the PyQt6 frontend (`overlay_native/`) connects to it and draws the panels. There is no browser frontend or HTTP server — those were removed.
 
 ## Verified facts about WC3 1.36
 
@@ -44,12 +46,12 @@ Reads Warcraft III Reforged's **Observer Shared Memory API** (`War3StatsObserver
 
 ## Death tracking — important implementation note
 
-The Observer API does NOT track unit deaths (`total_count == alive_count` always). Deaths are computed in `overlay/app.js`:
+The Observer API does NOT track unit deaths (`total_count == alive_count` always). Deaths are computed client-side in `overlay_native/deaths.py` (driven each frame by `overlay_native/controller.py`):
 
-```javascript
-// _dt: { "teamKey:unitId": {prev, dead} }
-// On each frame: if alive < prev → dead += diff
-// If unit disappears from units_on_map → remaining prev units died
+```
+# tracker: { "teamKey:unitId": {prev, dead} }
+# On each frame: if alive < prev → dead += diff
+# If unit disappears from units_on_map → remaining prev units died
 ```
 
 Reset when `map_name` changes or `game_time` goes backwards (replay seek).
@@ -63,22 +65,20 @@ Reset when `map_name` changes or `game_time` goes backwards (replay seek).
 - `_player_to_dict()` — converts parsed player to JSON-serializable dict, includes `queue` dict from `researches_in_progress`
 
 ### `analyzer/server.py`
-- `AnalyzerServer` — runs two servers in one process:
-  - `asyncio`/`websockets` on port 8125 for game state push (1 s interval)
-  - `threading.Thread` + `http.server.HTTPServer` on port 8126 for static files
-- HTTP handler overrides `do_GET` to inject a timestamp version into `index.html` script tags → prevents browser caching of `app.js`/`style.css`
-- HTTP handler also sends `Cache-Control: no-store` on all responses
+- `AnalyzerServer` — single `asyncio`/`websockets` server on port 8125 that pushes game state to connected clients (1 s interval). No HTTP server (the browser overlay was removed).
 
-### `overlay/app.js`
-Key functions:
-- `trackDeaths(teams, gameTime, mapName)` — updates `_dt` death tracker each frame
-- `buildUnits(players, container, teamKey)` — renders center panel unit rows
-- `buildHeroCard(hero)` — renders one hero card with portrait, bars, damage, items, abilities
-- `buildPlayerCard(player)` — renders one player card (resources + heroes + construction)
-- `render(state)` — full re-render each WebSocket message (1 s)
-- `unitName(id)` — looks up Chinese name; falls back to raw ID
+### `overlay_native/` (PyQt6 frontend — the only frontend)
+- `__main__.py` — entry point; spawns `python -m analyzer` as a subprocess, creates the panels, installs hotkeys
+- `panel.py` — `TeamPanel`: transparent layered window + all widgets (hero cards, unit grid, resources)
+- `controller.py` — consumes WebSocket messages, runs death tracking, triggers panel re-render each frame
+- `wsclient.py` — `QWebSocket` client with 3 s auto-reconnect to `ws://localhost:8125`
+- `deaths.py` — frame-by-frame death inference (see "Death tracking" above)
+- `names.py` — unit name lookup (Chinese names); falls back to raw ID
+- `icons.py` — lazy `QPixmap` cache; loads from `overlay_native/icons/*.jpg`
+- `hotkeys.py` — native `WM_HOTKEY` registration via `QAbstractNativeEventFilter`
+- `config.json` — saved panel positions (auto-created)
 
-### `overlay/icons/`
+### `overlay_native/icons/`
 ~2000 `.jpg` files named by WC3 unit rawcode (e.g., `Hamg.jpg`, `hfoo.jpg`).  
 Extracted from WC3 CASC storage using `tools/extract_icons_pure.py` (not included in this repo).  
 Icon format: 64×64 JPEG.
@@ -96,22 +96,26 @@ Key melee units:
 ## Common gotchas
 
 1. **`is_in_game` stays False** if `activate()` is not called before each read — WC3 clears the data between polls.
-2. **Browser caches JS** — the server dynamically injects `?v=<timestamp>` into script tags on every page load.
-3. **`edcm`** = Druid of the Claw morphed (Bear Form) — different ID from `edoc`.
-4. **`ubsp`** = Obsidian Destroyer (upgraded from `uobs`).
-5. **`ocat`** = Demolisher (Orc siege weapon), NOT Catapult.
-6. **`ospw`** = Spirit Walker, NOT Demolisher.
-7. Night Elf buildings: `eaom`=AncientOfWar, `etoa`=TreeOfAges, `etol`=TreeOfLife (not reversed).
+2. **`edcm`** = Druid of the Claw morphed (Bear Form) — different ID from `edoc`.
+3. **`ubsp`** = Obsidian Destroyer (upgraded from `uobs`).
+4. **`ocat`** = Demolisher (Orc siege weapon), NOT Catapult.
+5. **`ospw`** = Spirit Walker, NOT Demolisher.
+6. Night Elf buildings: `eaom`=AncientOfWar, `etoa`=TreeOfAges, `etol`=TreeOfLife (not reversed).
 
 ## Development
 
 ```bash
-# Start server with live Python changes
-python -m analyzer
+# Run the full app (overlay + analyzer subprocess); double-click 启动.bat, or:
+python -m overlay_native
 
-# Browser: http://localhost:8126
-# Edit overlay/app.js or overlay/style.css → new-tab the browser (cache-busting kicks in)
+# Run only the analyzer backend (WebSocket on ws://localhost:8125):
+python -m analyzer
 ```
+
+PyQt6 must come from an interpreter that actually has it installed. On the dev
+machine the `.venv` (MSYS2 Python) lacks PyQt6, so the overlay is launched with
+the system Python instead — see the `run-wc3overlay` skill in `.claude/skills/`
+for the exact launch/restart sequence.
 
 ## Dependencies
 

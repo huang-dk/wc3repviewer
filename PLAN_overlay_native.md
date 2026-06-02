@@ -72,7 +72,7 @@ overlay_native/
   wsclient.py     QWebSocket + 3s 自动重连
   deaths.py       DeathTracker（逐帧比较 alive 推算死亡，含换图/回退重置）
   names.py        UNIT_NAMES + raceKey/raceLabel + fmt_num/pct
-  icons.py        QPixmap 缓存，指向 ../overlay/icons/*.jpg，缺图回退文字
+  icons.py        QPixmap 缓存，指向 overlay_native/icons/*.jpg，缺图回退文字
   hotkeys.py      HotkeyFilter(QAbstractNativeEventFilter)
   config.json     面板几何（自动创建和更新）
   widgets/

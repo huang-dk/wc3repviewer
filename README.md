@@ -1,6 +1,6 @@
 # WC3 Replay Viewer
 
-A real-time overlay for Warcraft III Reforged replays. Displays hero stats, damage, unit counts and resources as a transparent panel overlaid directly on the game window — no browser required.
+A real-time overlay for Warcraft III Reforged replays. Displays hero stats, damage, unit counts and resources as a transparent PyQt6 panel overlaid directly on the game window — no browser involved.
 
 ## Quick Start
 
@@ -72,25 +72,21 @@ WC3 Reforged
 wc3rep/
 ├── analyzer/               Python backend (WebSocket + shared memory reader)
 │   ├── __main__.py
-│   ├── server.py           ws://8125 + http://8126
+│   ├── server.py           WebSocket ws://8125 (game state push)
 │   └── reader.py           war3structs shared memory reader
-├── overlay/                Legacy browser overlay (still works at http://8126)
-│   ├── app.js
-│   ├── style.css
-│   └── icons/              ~2 000 unit/hero/item icons from WC3
-├── overlay_native/         Native PyQt6 overlay (primary)
+├── overlay_native/         Native PyQt6 overlay (the only frontend)
 │   ├── __main__.py         Entry point + subprocess launcher
 │   ├── panel.py            TeamPanel — transparent window + all widgets
 │   ├── controller.py       WebSocket data → death tracking → panel render
 │   ├── wsclient.py         QWebSocket client (3 s auto-reconnect)
 │   ├── deaths.py           Frame-by-frame death inference
 │   ├── names.py            Unit name map + helpers
-│   ├── icons.py            QPixmap cache (overlay/icons/*.jpg)
+│   ├── icons.py            QPixmap cache (overlay_native/icons/*.jpg)
 │   ├── hotkeys.py          WM_HOTKEY via QAbstractNativeEventFilter
+│   ├── icons/              ~2 000 unit/hero/item icons from WC3
 │   └── config.json         Saved panel positions (auto-created)
 ├── 启动.bat                 Double-click launcher
-├── setup.bat               First-time dependency installer
-└── start.bat               Legacy browser overlay launcher
+└── setup.bat               First-time dependency installer
 ```
 
 ## Compatibility
