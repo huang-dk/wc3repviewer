@@ -92,12 +92,20 @@ def _building_to_dict(b) -> dict:
 
 def _player_to_dict(player) -> dict:
     # 生产队列：researches_in_progress 实际存放正在训练的单位 ID
-    # 用 Counter 统计每种单位各有几个在队列中
-    queue: dict[str, int] = {}
+    # 每种单位记录：count（队列中数量）+ progress（当前正在制造那个的进度%）
+    # progress_percent 与游戏内建筑生产进度条一致；取同类中最大值=正在制造的那个
+    queue: dict[str, dict] = {}
     for r in player.researches_in_progress:
         uid = r.id
         if uid and not uid.startswith('\x00'):
-            queue[uid] = queue.get(uid, 0) + 1
+            prog = getattr(r, 'progress_percent', 0)
+            e = queue.get(uid)
+            if e is None:
+                queue[uid] = {'count': 1, 'progress': prog}
+            else:
+                e['count'] += 1
+                if prog > e['progress']:
+                    e['progress'] = prog
 
     return {
         'name':       player.name,
@@ -114,7 +122,7 @@ def _player_to_dict(player) -> dict:
         'units':      [_unit_to_dict(u) for u in player.units_on_map],
         'buildings':  [_building_to_dict(b) for b in player.buildings_on_map],
         'upgrades':   [u.id for u in player.upgrades_completed if u.id],
-        'queue':      queue,   # {'ucry': 2, 'hfoo': 1, ...}
+        'queue':      queue,   # {'ucry': {'count': 2, 'progress': 47}, ...}
     }
 
 

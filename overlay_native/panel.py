@@ -353,7 +353,7 @@ def _upgrades_widget(upgrades: list, mirror: bool) -> 'QWidget | None':
 
 # ── 单位格：图标（存活数徽章）+ 可选生产进度条 ────────────────────────────────
 def _unit_row(uid: str, alive: int, dead: int, queue: int,
-              mirror: bool) -> QWidget:
+              progress: int, mirror: bool) -> QWidget:
     w = QWidget()
     w.setStyleSheet('background:transparent;')
     outer = QVBoxLayout(w)
@@ -392,24 +392,15 @@ def _unit_row(uid: str, alive: int, dead: int, queue: int,
         top.addStretch()
     outer.addLayout(top)
 
-    # ── 生产队列：不定态进度条（表示1个正在制造）+ 黄色+N ──
+    # ── 生产队列：进度条宽度 = 图标宽度，进度% 与游戏内建筑生产条一致 + 黄色+N ──
     if queue > 0:
         prod = QHBoxLayout()
         prod.setSpacing(3)
         prod.setContentsMargins(0, 0, 0, 0)
 
-        bar = QProgressBar()
-        bar.setRange(0, 0)      # 不定态动画
-        bar.setTextVisible(False)
-        bar.setFixedHeight(3)
-        bar.setStyleSheet("""
-            QProgressBar {
-                background:#1a1808; border-radius:1px; border:none;
-            }
-            QProgressBar::chunk {
-                background:#c8a060; border-radius:1px;
-            }
-        """)
+        # 与英雄血条同一套 _bar：定值进度（0~100%），固定宽度 = UNIT_ICON
+        bar = _bar(min(1.0, max(0.0, progress / 100.0)),
+                   '#c8a060', '#f0d070', h=4, w=UNIT_ICON, mirror=mirror)
 
         if mirror:
             prod.addStretch()
@@ -495,8 +486,11 @@ class TeamPanel(QWidget):
         need_h = w.sizeHint().height()
         if need_h <= 0:
             return
-        screen = QApplication.primaryScreen().geometry()
-        max_h  = screen.height() - self.y() - 20
+        # 用面板实际所在的屏幕（多显示器时 primaryScreen 可能更矮 → 误截断），
+        # 并计入该屏幕的纵向偏移 top()。
+        scr    = self.screen() or QApplication.primaryScreen()
+        geo    = scr.availableGeometry()
+        max_h  = geo.top() + geo.height() - self.y() - 8
         new_h  = max(60, min(need_h + 6, max_h))
         if abs(new_h - self.height()) > 4:
             self.resize(self.width(), new_h)
@@ -549,15 +543,18 @@ class TeamPanel(QWidget):
 
         def get(uid):
             if uid not in merged:
-                merged[uid] = {'id': uid, 'alive': 0, 'dead': 0, 'queue': 0}
+                merged[uid] = {'id': uid, 'alive': 0, 'dead': 0,
+                               'queue': 0, 'progress': 0}
             return merged[uid]
 
         for p in players:
             for u in (p.get('units') or []):
                 e = get(u['id'])
                 e['alive'] += u.get('alive', 0)
-            for uid, cnt in (p.get('queue') or {}).items():
-                get(uid)['queue'] += cnt
+            for uid, q in (p.get('queue') or {}).items():
+                e = get(uid)
+                e['queue']   += q.get('count', 0)
+                e['progress'] = max(e['progress'], q.get('progress', 0))
 
         for uid, dead in deaths_map.items():
             get(uid)['dead'] = dead
@@ -576,7 +573,7 @@ class TeamPanel(QWidget):
             # mirror: col 1→0→1→0... 内容靠右堆叠
             col = (1 - i % 2) if self.mirror else (i % 2)
             cell = _unit_row(u['id'], u['alive'], u['dead'], u['queue'],
-                             self.mirror)
+                             u['progress'], self.mirror)
             grid.addWidget(cell, i // 2, col)
         return w
 
