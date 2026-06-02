@@ -12,7 +12,13 @@ node_modules/
 # Logs
 server_out.txt
 server_err.txt
+app_out.txt
+app_err.txt
 *.log
+
+# Local overlay window position / scratch
+overlay_native/config.json
+test_enc.py
 
 # OS
 .DS_Store
