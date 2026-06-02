@@ -6,6 +6,9 @@ __pycache__/
 *.pyd
 *.egg-info/
 
+# Node
+node_modules/
+
 # Logs
 server_out.txt
 server_err.txt

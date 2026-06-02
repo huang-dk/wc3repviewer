@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel
 
 ICONS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', 'overlay', 'icons'))
+    os.path.join(os.path.dirname(__file__), 'icons'))
 
 _cache: dict = {}
 
